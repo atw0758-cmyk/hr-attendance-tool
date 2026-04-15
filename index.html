@@ -493,7 +493,11 @@ function parseRosterWorkbook(buf,company){
     // 第三欄 Y=需要打卡 N=無需打卡（空白預設Y）
     const clockVal=String(row[2]||'').trim().toUpperCase();
     const exempt=clockVal==='N';
-    result[sn]={id,company,origName:name,exempt};
+    // 第四欄 遲到門檻（如 10:00），空白用公司預設
+    const lateThreshRaw=String(row[3]||'').trim();
+    let lateThresh=null;
+    if(lateThreshRaw){const m=lateThreshRaw.match(/(\d{1,2}):(\d{2})/);if(m)lateThresh=+m[1]*60+ +m[2];}
+    result[sn]={id,company,origName:name,exempt,lateThresh};
   }
   return result;
 }
@@ -506,7 +510,8 @@ function parseScheduleWorkbook(buf){
   for(let i=0;i<raw.length;i++){if(String(raw[i][1]).includes('日期')||String(raw[i][0]).includes('月份')){hr=i;break;}}
   if(hr<0)return{ok:false,msg:'找不到表头行'};
   const headers=raw[hr],nameMap={};
-  for(let c=4;c<headers.length;c++){const n=String(headers[c]).trim();if(n)nameMap[c]=n;}
+  const SKIP_COLS=['上班人数','上班人數','月份','日期','星期',''];
+  for(let c=3;c<headers.length;c++){const n=String(headers[c]).trim();if(n&&!SKIP_COLS.includes(n))nameMap[c]=n;}
   const schedule={};let count=0;
   for(let r=hr+1;r<raw.length;r++){
     const row=raw[r];let ds='';const dv=row[1];
@@ -528,8 +533,10 @@ function detectAnomalies(records){
     if(r.company==='SETV'&&isSetvDayOff(r.name,r.date))continue;
     if(r.sIn===null)continue;
     const flex=r.company==='智影'?30:0,issues=[];
-    // 智影遲到門檻統一為 10:30（630分鐘），不論班別
-    const lateThreshold=r.company==='智影'?630:(r.sIn+flex);
+    // 遲到門檻：花名冊第四欄可個別設定，否則智影預設10:30，SETV依應出勤時間
+    const rosterInfo=roster[normName(r.name)]||roster[r.name];
+    const personalThresh=rosterInfo&&rosterInfo.lateThresh!=null?rosterInfo.lateThresh:null;
+    const lateThreshold=personalThresh!==null?personalThresh:(r.company==='智影'?630:(r.sIn+flex));
     if(r.aIn===null&&r.aOut===null){issues.push({type:'旷职',label:'旷职'});}
     else{
       if(r.aIn!==null){if(r.aIn>=15*60)issues.push({type:'打卡异常',label:'打卡数据异常（时间异常）'});else if(r.aIn>lateThreshold)issues.push({type:'迟到',label:`迟到 ${r.aIn-lateThreshold}分钟`});}
@@ -648,7 +655,8 @@ async function loadSchedFromGSheet(){
     for(let i=0;i<rawData.length;i++){if(String(rawData[i][1]).includes('日期')||String(rawData[i][0]).includes('月份')){hr=i;break;}}
     if(hr<0)throw new Error('找不到表头行（需含「月份」或「日期」）');
     const headers=rawData[hr],nameMap={};
-    for(let c=4;c<headers.length;c++){const n=String(headers[c]).trim();if(n)nameMap[c]=n;}
+    const SKIP_COLS2=['上班人数','上班人數','月份','日期','星期',''];
+    for(let c=3;c<headers.length;c++){const n=String(headers[c]).trim();if(n&&!SKIP_COLS2.includes(n))nameMap[c]=n;}
     const schedule={};let count=0;
     for(let r=hr+1;r<rawData.length;r++){
       const row=rawData[r];let ds='';const dv=row[1];
