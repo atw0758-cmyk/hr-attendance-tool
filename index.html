@@ -519,7 +519,7 @@ function parseScheduleWorkbook(buf){
     else if(typeof dv==='string'){const m=dv.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)ds=`${m[1]}-${m[2]}-${m[3]}`;}
     else if(typeof dv==='number'){const d=XLSX.SSF.parse_date_code(dv);if(d)ds=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
     if(!ds)continue;
-    for(const[col,name]of Object.entries(nameMap)){const val=String(row[col]||'').trim();if(!val)continue;schedule[`${name}|${ds}`]=val;count++;}
+    for(const[col,name]of Object.entries(nameMap)){const val=String(row[col]||'').trim();if(!val)continue;schedule[`${name}|${ds}`]=val;const sn=normName(name);if(sn!==name)schedule[`${sn}|${ds}`]=val;count++;}
   }
   return{ok:true,schedule,names:Object.values(nameMap),count};
 }
@@ -663,7 +663,7 @@ async function loadSchedFromGSheet(){
       if(dv instanceof Date)ds=`${dv.getFullYear()}-${String(dv.getMonth()+1).padStart(2,'0')}-${String(dv.getDate()).padStart(2,'0')}`;
       else if(typeof dv==='string'){const m=dv.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)ds=`${m[1]}-${m[2]}-${m[3]}`;}
       if(!ds)continue;
-      for(const[col,name]of Object.entries(nameMap)){const val=String(row[col]||'').trim();if(!val)continue;schedule[`${name}|${ds}`]=val;count++;}
+      for(const[col,name]of Object.entries(nameMap)){const val=String(row[col]||'').trim();if(!val)continue;schedule[`${name}|${ds}`]=val;const sn=normName(name);if(sn!==name)schedule[`${sn}|${ds}`]=val;count++;}
     }
     setvSchedule=schedule;scheduleLoaded=true;
     scheduleMeta={fileName:'Google Sheet',names:Object.values(nameMap).length,count,savedAt:new Date().toLocaleDateString('zh-CN')};
